@@ -9,15 +9,42 @@ let LRELU_SLOPE: Float = 0.1
 // MARK: - Modules
 
 class Conv1d: Module {
-    let conv: MLXNN.Conv1d
+    let inputChannels: Int
+    let outputChannels: Int
+    let kernelSize: Int
+    let stride: Int
+    let padding: Int
+    let dilation: Int
     
+    var weight: MLXArray
+    var bias: MLXArray?
+
     init(_ inChannels: Int, _ outChannels: Int, kernelSize: Int, stride: Int = 1, padding: Int = 0, dilation: Int = 1, bias: Bool = true) {
-        self.conv = MLXNN.Conv1d(inputChannels: inChannels, outputChannels: outChannels, kernelSize: kernelSize, stride: stride, padding: padding, dilation: dilation, bias: bias)
+        self.inputChannels = inChannels
+        self.outputChannels = outChannels
+        self.kernelSize = kernelSize
+        self.stride = stride
+        self.padding = padding
+        self.dilation = dilation
+        
+        let scale = 1.0 / sqrt(Float(inChannels * kernelSize))
+        self.weight = MLXRandom.uniform(low: -scale, high: scale, [outChannels, kernelSize, inChannels])
+        if bias {
+            self.bias = MLX.zeros([outChannels])
+        } else {
+            self.bias = nil
+        }
         super.init()
     }
     
     func callAsFunction(_ x: MLXArray) -> MLXArray {
-        return conv(x)
+        // MLX.conv1d expects: [N, H, C_in] (or with stream/groups)
+        // weight: [C_out, H, C_in]
+        var out = MLX.conv1d(x, weight, stride: stride, padding: padding, dilation: dilation)
+        if let bias = bias {
+            out = out + bias
+        }
+        return out
     }
 }
 
@@ -427,7 +454,7 @@ class Generator: Module {
             
             // MEMORY FIX: Evaluate and clear cache after each stage
             MLX.eval(out)
-            MLX.Memory.clearCache()
+            MLX.GPU.clearCache()
             print("DEBUG: Generator.ups[\(i)] (after resblocks) out: [\(out.min().item(Float.self))...\(out.max().item(Float.self))]")
         }
 

@@ -1,6 +1,7 @@
 import Foundation
 import MLX
 import MLXRandom
+import MLXFFT
 
 // MARK: - Digital Signal Processing Utilities
 // Replicating librosa features for benchmarking
@@ -54,7 +55,7 @@ public struct DSPUtils {
         
         // 4. FFT
         // MLX FFT operates on last axis by default
-        let fft = MLX.rfft(windowed) 
+        let fft = MLXFFT.rfft(windowed) 
         
         // Power spectrum = magnitude^2
         let power = MLX.square(MLX.abs(fft))

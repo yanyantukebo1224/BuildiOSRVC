@@ -3,6 +3,7 @@ import Foundation
 import MLX
 import MLXNN
 import MLXFFT
+import MLXRandom
 
 // MARK: - Custom BatchNorm with Running Stats Support
 

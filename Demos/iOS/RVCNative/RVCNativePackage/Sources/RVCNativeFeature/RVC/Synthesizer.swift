@@ -252,9 +252,9 @@ class WaveNet: Module {
     let cond_layer: MLXNN.Conv1d?
 
     // Individual layers registered as in_layer_0, in_layer_1, etc. to match Python weight keys
-    let in_layer_0: MLXNN.Conv1d
-    let in_layer_1: MLXNN.Conv1d
-    let in_layer_2: MLXNN.Conv1d
+    let in_layer_0: Conv1d
+    let in_layer_1: Conv1d
+    let in_layer_2: Conv1d
 
     // res_skip_layer_2 (last layer) outputs hidden_channels, others output 2*hidden_channels
     let res_skip_layer_0: MLXNN.Conv1d
@@ -273,9 +273,9 @@ class WaveNet: Module {
         let dilations = (0..<nLayers).map { Int(pow(Double(dilationRate), Double($0))) }
         let paddings = dilations.map { (kernelSize * $0 - $0) / 2 }
 
-        self.in_layer_0 = MLXNN.Conv1d(inputChannels: hiddenChannels, outputChannels: 2 * hiddenChannels, kernelSize: kernelSize, padding: paddings[0], dilation: dilations[0])
-        self.in_layer_1 = MLXNN.Conv1d(inputChannels: hiddenChannels, outputChannels: 2 * hiddenChannels, kernelSize: kernelSize, padding: paddings[1], dilation: dilations[1])
-        self.in_layer_2 = MLXNN.Conv1d(inputChannels: hiddenChannels, outputChannels: 2 * hiddenChannels, kernelSize: kernelSize, padding: paddings[2], dilation: dilations[2])
+        self.in_layer_0 = Conv1d(hiddenChannels, 2 * hiddenChannels, kernelSize: kernelSize, padding: paddings[0], dilation: dilations[0])
+        self.in_layer_1 = Conv1d(hiddenChannels, 2 * hiddenChannels, kernelSize: kernelSize, padding: paddings[1], dilation: dilations[1])
+        self.in_layer_2 = Conv1d(hiddenChannels, 2 * hiddenChannels, kernelSize: kernelSize, padding: paddings[2], dilation: dilations[2])
 
         // res_skip_layers: last layer outputs hidden_channels, others output 2*hidden_channels
         self.res_skip_layer_0 = MLXNN.Conv1d(inputChannels: hiddenChannels, outputChannels: 2 * hiddenChannels, kernelSize: 1)
