@@ -31,6 +31,8 @@ jobs:
             echo "mlx-swift submodule is missing or empty. Cloning from GitHub at tag 0.21.0..."
             rm -rf Vendor/mlx-swift
             git clone --depth 1 --branch 0.21.0 https://github.com/ml-explore/mlx-swift.git Vendor/mlx-swift
+            cd Vendor/mlx-swift
+            git submodule update --init --recursive
           fi
 
       - name: Build and Test Package
