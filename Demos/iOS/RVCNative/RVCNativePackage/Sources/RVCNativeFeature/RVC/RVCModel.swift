@@ -88,24 +88,24 @@ class ResBlock: Module {
 
             // Print weight statistics for ALL convolutions with full detail
             for (i, c1) in convs1.enumerated() {
-                let w = c1.conv.weight
+                let w = c1.weight
                 MLX.eval(w)
-                print("DEBUG ResBlock: c1_\(i).conv.weight shape=\(w.shape), range=[\(w.min().item(Float.self))...\(w.max().item(Float.self))], mean=\(w.mean().item(Float.self))")
+                print("DEBUG ResBlock: c1_\(i).weight shape=\(w.shape), range=[\(w.min().item(Float.self))...\(w.max().item(Float.self))], mean=\(w.mean().item(Float.self))")
 
                 // Print a few actual weight values to compare with Python
                 let wSlice = w[0, 0, 0..<5]  // First 5 values of first filter
                 MLX.eval(wSlice)
                 print("DEBUG ResBlock: c1_\(i) weight[0,0,:5] = \(wSlice.asArray(Float.self))")
 
-                if let b = c1.conv.bias {
+                if let b = c1.bias {
                     MLX.eval(b)
-                    print("DEBUG ResBlock: c1_\(i).conv.bias range=[\(b.min().item(Float.self))...\(b.max().item(Float.self))]")
+                    print("DEBUG ResBlock: c1_\(i).bias range=[\(b.min().item(Float.self))...\(b.max().item(Float.self))]")
                 }
             }
             for (i, c2) in convs2.enumerated() {
-                let w = c2.conv.weight
+                let w = c2.weight
                 MLX.eval(w)
-                print("DEBUG ResBlock: c2_\(i).conv.weight shape=\(w.shape), range=[\(w.min().item(Float.self))...\(w.max().item(Float.self))], mean=\(w.mean().item(Float.self))")
+                print("DEBUG ResBlock: c2_\(i).weight shape=\(w.shape), range=[\(w.min().item(Float.self))...\(w.max().item(Float.self))], mean=\(w.mean().item(Float.self))")
             }
         }
 

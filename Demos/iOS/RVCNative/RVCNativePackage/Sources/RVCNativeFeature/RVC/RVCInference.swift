@@ -449,9 +449,9 @@ import MLXNN
                 }
 
                 // Check Generator resblock weights - CRITICAL for detecting weight loading issues
-                let w0 = synth.dec.resblock_0.c1_0.conv.weight
+                let w0 = synth.dec.resblock_0.c1_0.weight
                 MLX.eval(w0)
-                log("DEBUG: resblock_0.c1_0.conv.weight (kernel=3): shape=\(w0.shape), range=[\(w0.min().item(Float.self))...\(w0.max().item(Float.self))], mean=\(w0.mean().item(Float.self))")
+                log("DEBUG: resblock_0.c1_0.weight (kernel=3): shape=\(w0.shape), range=[\(w0.min().item(Float.self))...\(w0.max().item(Float.self))], mean=\(w0.mean().item(Float.self))")
                 log("DEBUG: EXPECTED from Drake.safetensors: shape=(256, 3, 256), range=[-0.44, 0.66], mean=-0.0013")
 
                 // Compare with what was in synthParams before loading
