@@ -1,0 +1,58 @@
+name: Build iOS App
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build iOS App
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Show Xcode List
+        run: xcode-select -p
+
+      - name: Set up Swift / Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.app || sudo xcode-select -s /Applications/Xcode_16.1.app || true
+
+      - name: Install mlx-swift dependency
+        run: |
+          cd Demos/iOS/RVCNative
+          mkdir -p Vendor
+          if [ ! -f "Vendor/mlx-swift/Package.swift" ]; then
+            echo "mlx-swift submodule is missing or empty. Cloning from GitHub..."
+            rm -rf Vendor/mlx-swift
+            git clone --depth 1 https://github.com/ml-explore/mlx-swift.git Vendor/mlx-swift
+          fi
+
+      - name: Build and Test Package
+        run: |
+          cd Demos/iOS/RVCNative/RVCNativePackage
+          swift build -v
+
+      - name: Resolve Xcode Dependencies
+        run: |
+          cd Demos/iOS/RVCNative
+          xcodebuild -resolvePackageDependencies -workspace RVCNative.xcworkspace -scheme RVCNative
+
+      - name: Build iOS App (Simulator)
+        run: |
+          cd Demos/iOS/RVCNative
+          xcodebuild build \
+            -workspace RVCNative.xcworkspace \
+            -scheme RVCNative \
+            -destination "generic/platform=iOS Simulator" \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
