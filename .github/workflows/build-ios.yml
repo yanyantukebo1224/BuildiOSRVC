@@ -62,9 +62,17 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             -derivedDataPath build
-            
+
+      - name: Package IPA
+        run: |
+          cd Demos/iOS/RVCNative
+          mkdir -p build/Payload
+          cp -r build/Build/Products/Debug-iphoneos/RVCNative.app build/Payload/
+          cd build
+          zip -r RVCNative.ipa Payload
+
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RVCNative-App
-          path: Demos/iOS/RVCNative/build/Build/Products/Debug-iphoneos/RVCNative.app
+          name: RVCNative-IPA
+          path: Demos/iOS/RVCNative/build/RVCNative.ipa
