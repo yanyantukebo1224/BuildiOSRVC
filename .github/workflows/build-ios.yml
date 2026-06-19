@@ -28,9 +28,9 @@ jobs:
           cd Demos/iOS/RVCNative
           mkdir -p Vendor
           if [ ! -f "Vendor/mlx-swift/Package.swift" ]; then
-            echo "mlx-swift submodule is missing or empty. Cloning from GitHub at tag v0.22.0..."
+            echo "mlx-swift submodule is missing or empty. Cloning from GitHub at tag v0.21.0..."
             rm -rf Vendor/mlx-swift
-            git clone --depth 1 --branch v0.22.0 https://github.com/ml-explore/mlx-swift.git Vendor/mlx-swift
+            git clone --depth 1 --branch v0.21.0 https://github.com/ml-explore/mlx-swift.git Vendor/mlx-swift
           fi
 
       - name: Build and Test Package
