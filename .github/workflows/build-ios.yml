@@ -51,7 +51,7 @@ jobs:
           xcodebuild build \
             -workspace RVCNative.xcworkspace \
             -scheme RVCNative \
-            -destination "generic/platform=iOS Simulator" \
+            -destination "generic/platform=iOS" \
             -configuration Debug \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
