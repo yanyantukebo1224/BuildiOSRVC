@@ -29,6 +29,8 @@ GENERATE_INFOPLIST_FILE = YES
 INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationLandscapeRight UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationPortrait
 INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = UIInterfaceOrientationLandscapeRight UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown
 INFOPLIST_KEY_NSMicrophoneUsageDescription = We need access to your microphone to record audio for voice conversion.
+INFOPLIST_KEY_UIFileSharingEnabled = YES
+INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES
 
 // ==========================================
 // Entitlements
