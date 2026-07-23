@@ -378,6 +378,19 @@ struct ContentView: View {
             self.log(msg)
         }
 
+        // Write a placeholder file to Documents directory to force iOS to show the RVCNative folder in the Files app
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let placeholderURL = docs.appendingPathComponent("README.txt")
+        if !FileManager.default.fileExists(atPath: placeholderURL.path) {
+            let readmeContent = """
+            Welcome to RVC Native!
+            Place your RVC voice models (.safetensors / .npz / .pth / .zip) and index files (.index) in this directory.
+            They will automatically appear in the Model Gallery tab.
+            """
+            try? readmeContent.write(to: placeholderURL, atomically: true, encoding: .utf8)
+            log("Created README.txt in Documents directory to enable iOS file sharing folder visibility.")
+        }
+
         refreshImportedModels()
 
         // Auto-load first model if none selected
@@ -633,7 +646,10 @@ struct ContentView: View {
 
         guard let url = modelUrl else {
             log("Failed to find model file: \(filename).safetensors")
-            statusMessage = "Model \(name) not found in bundle"
+            statusMessage = "Model \(name) not found"
+            alertTitle = "Model Not Found"
+            alertMessage = "Could not find model file: \(filename).safetensors\nIf this is an imported model, please check if the file exists. If it is a bundled model, please check the build assets."
+            showAlert = true
             return
         }
         log("Found model at \(url.path)")
@@ -644,6 +660,9 @@ struct ContentView: View {
         guard let hubertURL = hubertUrl else {
             log("Failed to find hubert_base.safetensors")
             statusMessage = "Hubert model not found!"
+            alertTitle = "Required Model Missing"
+            alertMessage = "Required base model 'hubert_base.safetensors' is missing from the bundle. Please import 'hubert_base.safetensors' via the Model Gallery or place it in the Shared folder."
+            showAlert = true
             return
         }
 
