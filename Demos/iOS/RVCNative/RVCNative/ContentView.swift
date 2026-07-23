@@ -173,7 +173,14 @@ struct ContentView: View {
                 }
             case .audio:
                 DocumentPicker(
-                    contentTypes: [UTType.mp3, UTType.wav]
+                    contentTypes: [
+                        .audio,
+                        .mp3,
+                        .wav,
+                        UTType(filenameExtension: "m4a") ?? .audio,
+                        UTType(filenameExtension: "caf") ?? .audio,
+                        .data
+                    ]
                 ) { url in
                     activeImport = nil
                     handleAudioFileImportURL(url: url)

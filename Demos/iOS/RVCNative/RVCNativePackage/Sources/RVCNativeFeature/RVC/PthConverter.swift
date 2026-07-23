@@ -46,7 +46,7 @@ public final class PthConverter: Sendable {
                 
                 if fileURL.lastPathComponent == "data.pkl" {
                     modelFiles.append(fileURL)
-                } else if fileURL.pathExtension.lowercased() == "pth" {
+                } else if fileURL.pathExtension.lowercased() == "pth" || fileURL.pathExtension.lowercased() == "pt" {
                     modelFiles.append(fileURL)
                 } else if fileURL.pathExtension.lowercased() == "index" {
                     indexFiles.append(fileURL)
@@ -72,14 +72,15 @@ public final class PthConverter: Sendable {
             }
         }
         
-        // Helper to find data.pkl in a model URL (might be a directory or a .pth zip)
+        // Helper to find data.pkl in a model URL (might be a directory or a .pth/.pt zip)
         func findDataPkl(in root: URL) -> (URL, URL)? {
             if root.lastPathComponent == "data.pkl" {
                 return (root, root.deletingLastPathComponent())
             }
             
-            // If it's a .pth file, it's actually a zip. Extract it!
-            if root.pathExtension.lowercased() == "pth" {
+            // If it's a .pth / .pt file, it's actually a zip. Extract it!
+            let ext = root.pathExtension.lowercased()
+            if ext == "pth" || ext == "pt" {
                 let nestedTemp = root.deletingLastPathComponent().appendingPathComponent("extracted_\(root.lastPathComponent)")
                 do {
                     try fm.createDirectory(at: nestedTemp, withIntermediateDirectories: true)
@@ -93,7 +94,7 @@ public final class PthConverter: Sendable {
                         }
                     }
                 } catch {
-                    print("Failed to extract nested .pth: \(error)")
+                    print("Failed to extract nested .\(ext): \(error)")
                 }
             }
             return nil
