@@ -501,10 +501,12 @@ struct ContentView: View {
 
                         let dest = docs.appendingPathComponent(modelName + ".safetensors")
                         try MLX.save(arrays: arrays, url: dest)
+                        // Clean up raw .pth / .pt after converting to safetensors
+                        try? FileManager.default.removeItem(at: destURL)
 
                         await MainActor.run {
                             statusMessage = "Converted & Imported: \(modelName)"
-                            log("Converted model saved to \(dest.path)")
+                            log("Converted model saved to \(dest.path) (raw source removed)")
                             isConverting = false
                             conversionProgress = 1.0
                             refreshImportedModels()

@@ -100,16 +100,22 @@ public final class PthConverter: Sendable {
             return nil
         }
         
-        // Pick the best candidate
-        if let first = modelFiles.first {
-            if modelFiles.count > 1 {
-                print("Warning: Multiple model candidates found. Picking: \(first.lastPathComponent)")
-            }
-            
-            if let found = findDataPkl(in: first) {
+        // Pick the best candidate by iterating through all model files until data.pkl is found
+        for candidate in modelFiles {
+            if let found = findDataPkl(in: candidate) {
                 dataPklUrl = found.0
                 storageRoot = found.1
-                progress?(0.15, "Using model: \(first.lastPathComponent)")
+                progress?(0.15, "Using model: \(candidate.lastPathComponent)")
+                print("PthConverter: Found data.pkl at \(found.0.path)")
+                break
+            }
+        }
+        
+        // Also check root tempDir for data.pkl if enumerator missed it
+        if dataPklUrl == nil {
+            if let found = findDataPkl(in: tempDir) {
+                dataPklUrl = found.0
+                storageRoot = found.1
             }
         }
         

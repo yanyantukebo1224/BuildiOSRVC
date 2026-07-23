@@ -9,8 +9,29 @@ class ConsoleLogRedirector: ObservableObject {
     private var originalStdout: Int32 = -1
     private var originalStderr: Int32 = -1
     
+    private var logFileHandle: FileHandle?
+    
     private init() {
+        setupFileLogging()
         setupRedirect()
+    }
+    
+    private func setupFileLogging() {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let logsDir = docs.appendingPathComponent("logs")
+        try? FileManager.default.createDirectory(at: logsDir, withIntermediateDirectories: true)
+        
+        let logFileURL = logsDir.appendingPathComponent("app_log.txt")
+        if !FileManager.default.fileExists(atPath: logFileURL.path) {
+            FileManager.default.createFile(atPath: logFileURL.path, contents: nil)
+        }
+        logFileHandle = try? FileHandle(forWritingTo: logFileURL)
+        logFileHandle?.seekToEndOfFile()
+        
+        let sessionHeader = "\n--- SESSION STARTED AT \(Date()) ---\n"
+        if let data = sessionHeader.data(using: .utf8) {
+            logFileHandle?.write(data)
+        }
     }
     
     func setupRedirect() {
@@ -25,6 +46,9 @@ class ConsoleLogRedirector: ObservableObject {
         pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
             guard !data.isEmpty else { return }
+            
+            // Write to file on disk in logs directory
+            self?.logFileHandle?.write(data)
             
             // 1. Write back to original stdout so it still shows in Xcode console (TEE)
             if let stdout = self?.originalStdout, stdout != -1 {
