@@ -159,7 +159,14 @@ struct ContentView: View {
             switch importType {
             case .model:
                 DocumentPicker(
-                    contentTypes: [UTType(filenameExtension: "safetensors")!, UTType(filenameExtension: "npz")!, UTType(filenameExtension: "pth")!, UTType.zip]
+                    contentTypes: [
+                        UTType(filenameExtension: "safetensors") ?? .data,
+                        UTType(filenameExtension: "npz") ?? .data,
+                        UTType(filenameExtension: "pth") ?? .data,
+                        .zip,
+                        .data,
+                        .item
+                    ]
                 ) { url in
                     activeImport = nil
                     handleFileImportURL(url: url)
@@ -605,9 +612,12 @@ struct ContentView: View {
         guard let files = try? FileManager.default.contentsOfDirectory(at: docs, includingPropertiesForKeys: nil) else { return }
 
         importedModels = files
-            .filter { $0.pathExtension == "safetensors" || $0.pathExtension == "npz" }
+            .filter { 
+                let ext = $0.pathExtension.lowercased()
+                return ext == "safetensors" || ext == "npz" || ext == "pth" || ext == "zip"
+            }
             .map { $0.deletingPathExtension().lastPathComponent }
-            .filter { !$0.hasPrefix(".") }
+            .filter { !$0.hasPrefix(".") && !$0.lowercased().contains("hubert") && !$0.lowercased().contains("rmvpe") }
             .sorted()
     }
 
@@ -632,13 +642,29 @@ struct ContentView: View {
         }
 
         var modelUrl: URL?
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
 
         if isImported {
-            let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             let safe = docs.appendingPathComponent("\(name).safetensors")
             let npz = docs.appendingPathComponent("\(name).npz")
-            if FileManager.default.fileExists(atPath: safe.path) { modelUrl = safe }
-            else if FileManager.default.fileExists(atPath: npz.path) { modelUrl = npz }
+            let pth = docs.appendingPathComponent("\(name).pth")
+            let zip = docs.appendingPathComponent("\(name).zip")
+            
+            if FileManager.default.fileExists(atPath: safe.path) {
+                modelUrl = safe
+            } else if FileManager.default.fileExists(atPath: npz.path) {
+                modelUrl = npz
+            } else if FileManager.default.fileExists(atPath: pth.path) {
+                // AUTO CONVERT raw .pth model
+                log("loadModel: Raw .pth detected, launching auto-conversion...")
+                handleFileImportURL(url: pth)
+                return
+            } else if FileManager.default.fileExists(atPath: zip.path) {
+                // AUTO CONVERT raw .zip archive
+                log("loadModel: Raw .zip detected, launching auto-conversion...")
+                handleFileImportURL(url: zip)
+                return
+            }
         } else {
             modelUrl = RVCInference.bundle.url(forResource: filename, withExtension: "safetensors")
                 ?? RVCInference.bundle.url(forResource: filename, withExtension: "safetensors", subdirectory: "Assets")
@@ -647,9 +673,14 @@ struct ContentView: View {
         guard let url = modelUrl else {
             log("Failed to find model file: \(filename).safetensors")
             statusMessage = "Model \(name) not found"
-            alertTitle = "Model Not Found"
-            alertMessage = "Could not find model file: \(filename).safetensors\nIf this is an imported model, please check if the file exists. If it is a bundled model, please check the build assets."
-            showAlert = true
+            // If it is initial bundled load (like Coder on fresh start) and not present, fail silently to avoid blocking user interaction.
+            if !isImported {
+                statusMessage = "Please import a model or put it in RVCNative folder"
+            } else {
+                alertTitle = "Model Not Found"
+                alertMessage = "Could not find model file: \(filename).safetensors\nIf this is an imported model, please check if the file exists. If it is a bundled model, please check the build assets."
+                showAlert = true
+            }
             return
         }
         log("Found model at \(url.path)")
