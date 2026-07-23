@@ -455,34 +455,39 @@ struct ContentView: View {
     }
 
     func handleFileImportURL(url selectedFile: URL) {
-        guard selectedFile.startAccessingSecurityScopedResource() else {
-            log("Failed to access file: \(selectedFile.lastPathComponent)")
-            alertTitle = "Access Denied"
-            alertMessage = "Could not access the selected file"
-            showAlert = true
-            return
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        
+        // If file is already inside Documents, no security scoping needed
+        let isAlreadyInDocs = selectedFile.path.hasPrefix(docs.path)
+        var accessed = false
+        if !isAlreadyInDocs {
+            accessed = selectedFile.startAccessingSecurityScopedResource()
         }
 
-        defer { selectedFile.stopAccessingSecurityScopedResource() }
+        defer {
+            if accessed {
+                selectedFile.stopAccessingSecurityScopedResource()
+            }
+        }
 
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let filename = selectedFile.lastPathComponent
         let destURL = docs.appendingPathComponent(filename)
 
         do {
-            // Remove existing file
-            if FileManager.default.fileExists(atPath: destURL.path) {
-                try FileManager.default.removeItem(at: destURL)
+            if !isAlreadyInDocs {
+                // Remove existing file
+                if FileManager.default.fileExists(atPath: destURL.path) {
+                    try FileManager.default.removeItem(at: destURL)
+                }
+                // Copy to documents
+                try FileManager.default.copyItem(at: selectedFile, to: destURL)
             }
-
-            // Copy to documents
-            try FileManager.default.copyItem(at: selectedFile, to: destURL)
 
             let modelName = destURL.deletingPathExtension().lastPathComponent
 
             // Handle different file types
-            if selectedFile.pathExtension == "pth" {
-                log("Converting .pth model: \(modelName)")
+            if selectedFile.pathExtension.lowercased() == "pth" || selectedFile.pathExtension.lowercased() == "pt" {
+                log("Converting .pth/.pt model: \(modelName)")
                 statusMessage = "Converting model..."
                 isConverting = true
                 conversionProgress = 0.0
@@ -577,21 +582,28 @@ struct ContentView: View {
     }
 
     func handleAudioFileImportURL(url selectedFile: URL) {
-        guard selectedFile.startAccessingSecurityScopedResource() else {
-            log("Failed to access audio file")
-            return
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let isAlreadyInDocs = selectedFile.path.hasPrefix(docs.path)
+        var accessed = false
+        if !isAlreadyInDocs {
+            accessed = selectedFile.startAccessingSecurityScopedResource()
         }
 
-        defer { selectedFile.stopAccessingSecurityScopedResource() }
+        defer {
+            if accessed {
+                selectedFile.stopAccessingSecurityScopedResource()
+            }
+        }
 
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let destURL = docs.appendingPathComponent(selectedFile.lastPathComponent)
 
         do {
-            if FileManager.default.fileExists(atPath: destURL.path) {
-                try FileManager.default.removeItem(at: destURL)
+            if !isAlreadyInDocs {
+                if FileManager.default.fileExists(atPath: destURL.path) {
+                    try FileManager.default.removeItem(at: destURL)
+                }
+                try FileManager.default.copyItem(at: selectedFile, to: destURL)
             }
-            try FileManager.default.copyItem(at: selectedFile, to: destURL)
 
             inputURL = destURL
             originalWaveform = AudioWaveformExtractor.extractSamples(from: destURL)
@@ -614,7 +626,7 @@ struct ContentView: View {
         importedModels = files
             .filter { 
                 let ext = $0.pathExtension.lowercased()
-                return ext == "safetensors" || ext == "npz" || ext == "pth" || ext == "zip"
+                return ext == "safetensors" || ext == "npz" || ext == "pth" || ext == "pt" || ext == "zip"
             }
             .map { $0.deletingPathExtension().lastPathComponent }
             .filter { !$0.hasPrefix(".") && !$0.lowercased().contains("hubert") && !$0.lowercased().contains("rmvpe") }
@@ -648,6 +660,7 @@ struct ContentView: View {
             let safe = docs.appendingPathComponent("\(name).safetensors")
             let npz = docs.appendingPathComponent("\(name).npz")
             let pth = docs.appendingPathComponent("\(name).pth")
+            let pt = docs.appendingPathComponent("\(name).pt")
             let zip = docs.appendingPathComponent("\(name).zip")
             
             if FileManager.default.fileExists(atPath: safe.path) {
@@ -655,12 +668,14 @@ struct ContentView: View {
             } else if FileManager.default.fileExists(atPath: npz.path) {
                 modelUrl = npz
             } else if FileManager.default.fileExists(atPath: pth.path) {
-                // AUTO CONVERT raw .pth model
                 log("loadModel: Raw .pth detected, launching auto-conversion...")
                 handleFileImportURL(url: pth)
                 return
+            } else if FileManager.default.fileExists(atPath: pt.path) {
+                log("loadModel: Raw .pt detected, launching auto-conversion...")
+                handleFileImportURL(url: pt)
+                return
             } else if FileManager.default.fileExists(atPath: zip.path) {
-                // AUTO CONVERT raw .zip archive
                 log("loadModel: Raw .zip detected, launching auto-conversion...")
                 handleFileImportURL(url: zip)
                 return
@@ -673,37 +688,63 @@ struct ContentView: View {
         guard let url = modelUrl else {
             log("Failed to find model file: \(filename).safetensors")
             statusMessage = "Model \(name) not found"
-            // If it is initial bundled load (like Coder on fresh start) and not present, fail silently to avoid blocking user interaction.
             if !isImported {
                 statusMessage = "Please import a model or put it in RVCNative folder"
             } else {
                 alertTitle = "Model Not Found"
-                alertMessage = "Could not find model file: \(filename).safetensors\nIf this is an imported model, please check if the file exists. If it is a bundled model, please check the build assets."
+                alertMessage = "Could not find model file: \(filename).safetensors\nIf this is an imported model, please check if the file exists."
                 showAlert = true
             }
             return
         }
         log("Found model at \(url.path)")
 
-        let hubertUrl = RVCInference.bundle.url(forResource: "hubert_base", withExtension: "safetensors")
-            ?? RVCInference.bundle.url(forResource: "hubert_base", withExtension: "safetensors", subdirectory: "Assets")
+        // Check Documents directory first, then Bundle for hubert_base
+        let docHubertSafe = docs.appendingPathComponent("hubert_base.safetensors")
+        let docHubertPt = docs.appendingPathComponent("hubert_base.pt")
+        let docHubertPth = docs.appendingPathComponent("hubert_base.pth")
+
+        var hubertUrl: URL? = nil
+        if FileManager.default.fileExists(atPath: docHubertSafe.path) {
+            hubertUrl = docHubertSafe
+        } else if FileManager.default.fileExists(atPath: docHubertPt.path) {
+            hubertUrl = docHubertPt
+        } else if FileManager.default.fileExists(atPath: docHubertPth.path) {
+            hubertUrl = docHubertPth
+        } else {
+            hubertUrl = RVCInference.bundle.url(forResource: "hubert_base", withExtension: "safetensors")
+                ?? RVCInference.bundle.url(forResource: "hubert_base", withExtension: "safetensors", subdirectory: "Assets")
+        }
 
         guard let hubertURL = hubertUrl else {
-            log("Failed to find hubert_base.safetensors")
+            log("Failed to find hubert_base")
             statusMessage = "Hubert model not found!"
             alertTitle = "Required Model Missing"
-            alertMessage = "Required base model 'hubert_base.safetensors' is missing from the bundle. Please import 'hubert_base.safetensors' via the Model Gallery or place it in the Shared folder."
+            alertMessage = "Required base model 'hubert_base.pt' is missing. Please place hubert_base.pt in the RVCNative folder."
             showAlert = true
             return
         }
 
-        // Optional RMVPE
-        let rmvpeURL = RVCInference.bundle.url(forResource: "rmvpe", withExtension: "safetensors")
-            ?? RVCInference.bundle.url(forResource: "rmvpe", withExtension: "safetensors", subdirectory: "Assets")
-            ?? RVCInference.bundle.url(forResource: "rmvpe", withExtension: "npz")
-            ?? RVCInference.bundle.url(forResource: "rmvpe", withExtension: "npz", subdirectory: "Assets")
-            ?? RVCInference.bundle.url(forResource: "rmvpe_mlx", withExtension: "npz")
-            ?? RVCInference.bundle.url(forResource: "rmvpe_mlx", withExtension: "npz", subdirectory: "Assets")
+        // Optional RMVPE (Documents or Bundle)
+        let docRmvpeSafe = docs.appendingPathComponent("rmvpe.safetensors")
+        let docRmvpePt = docs.appendingPathComponent("rmvpe.pt")
+        let docRmvpePth = docs.appendingPathComponent("rmvpe.pth")
+
+        var rmvpeURL: URL? = nil
+        if FileManager.default.fileExists(atPath: docRmvpeSafe.path) {
+            rmvpeURL = docRmvpeSafe
+        } else if FileManager.default.fileExists(atPath: docRmvpePt.path) {
+            rmvpeURL = docRmvpePt
+        } else if FileManager.default.fileExists(atPath: docRmvpePth.path) {
+            rmvpeURL = docRmvpePth
+        } else {
+            rmvpeURL = RVCInference.bundle.url(forResource: "rmvpe", withExtension: "safetensors")
+                ?? RVCInference.bundle.url(forResource: "rmvpe", withExtension: "safetensors", subdirectory: "Assets")
+                ?? RVCInference.bundle.url(forResource: "rmvpe", withExtension: "npz")
+                ?? RVCInference.bundle.url(forResource: "rmvpe", withExtension: "npz", subdirectory: "Assets")
+                ?? RVCInference.bundle.url(forResource: "rmvpe_mlx", withExtension: "npz")
+                ?? RVCInference.bundle.url(forResource: "rmvpe_mlx", withExtension: "npz", subdirectory: "Assets")
+        }
 
         // Search for matching index file (for imported models)
         var indexUrl: URL? = nil
