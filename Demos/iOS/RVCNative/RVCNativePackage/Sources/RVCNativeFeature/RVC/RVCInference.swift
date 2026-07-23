@@ -110,14 +110,21 @@ import MLXNN
                 }
                 
                 // Remap feature_extractor.conv_layers.X to feature_extractor.lX
+                // PyTorch keys are: feature_extractor.conv_layers.0.conv.weight, feature_extractor.conv_layers.0.layer_norm.weight, etc.
                 if newKey.hasPrefix("feature_extractor.conv_layers.") {
                     let parts = newKey.components(separatedBy: ".")
                     if parts.count >= 3, let idx = Int(parts[2]) {
-                        newKey = "feature_extractor.l\(idx)." + parts.dropFirst(3).joined(separator: ".")
+                        let subPath = parts.dropFirst(3).joined(separator: ".")
+                        newKey = "feature_extractor.l\(idx).\(subPath)"
                     }
                 }
                 
-                newParams[newKey] = v
+                // Transpose Conv1d weights for feature_extractor: PyTorch [Out, In, Kernel] -> MLX [Out, Kernel, In]
+                if newKey.hasPrefix("feature_extractor.") && newKey.hasSuffix(".weight") && v.ndim == 3 {
+                    newParams[newKey] = v.transposed(axes: [0, 2, 1])
+                } else {
+                    newParams[newKey] = v
+                }
             }
             
             // Fix HuBERT PosConv Weight Norm
