@@ -48,6 +48,15 @@ final class PickleUnpickler {
     private let SHORT_BINUNICODE: UInt8 = 0x8c
     private let BINFLOAT: UInt8 = 0x47
     
+    // Pickle Protocol 4 & 5 Opcodes
+    private let BININT8: UInt8 = 0x8A       // 138 (64-bit int / 8-byte signed int)
+    private let BINBYTES: UInt8 = 0x8D      // 141
+    private let SHORT_BINBYTES: UInt8 = 0x8E// 142
+    private let MEMOIZE: UInt8 = 0x94       // 148 (Pushes top of stack into memo at next index)
+    private let FRAME: UInt8 = 0x95         // 149 (Frame size info, can be safely skipped)
+    private let NEWOBJ: UInt8 = 0x81        // 129
+    private let STACK_GLOBAL: UInt8 = 0x93  // 147
+    
     init(data: Data) {
         self.data = data
     }
@@ -63,6 +72,10 @@ final class PickleUnpickler {
                     // Ignore version
                     _ = readByte()
                     
+                case FRAME:
+                    // Frame opcode specifies size of frame (8 bytes uint64), just skip 8 bytes
+                    position += 8
+                    
                 case STOP:
                     guard let value = stack.popLast() else { throw PickleError.stackUnderflow }
                     return value
@@ -71,6 +84,13 @@ final class PickleUnpickler {
                     let module = try readLine()
                     let name = try readLine()
                     // Create a placeholder for the global class/function
+                    stack.append(GlobalReference(module: module, name: name))
+                    
+                case STACK_GLOBAL:
+                    guard let name = stack.popLast() as? String,
+                          let module = stack.popLast() as? String else {
+                        throw PickleError.invalidStructure
+                    }
                     stack.append(GlobalReference(module: module, name: name))
                     
                 case EMPTY_DICT:
@@ -98,6 +118,12 @@ final class PickleUnpickler {
                 case BININT:
                     stack.append(Int(try readInt32()))
                     
+                case BININT8:
+                    // 138 (0x8A): 8-byte signed int
+                    let val = data.subdata(in: position..<position+8).withUnsafeBytes { $0.load(as: Int64.self) }
+                    position += 8
+                    stack.append(Int(val))
+                    
                 case BINPUT:
                     let index = Int(readByte())
                     if let top = stack.last {
@@ -108,6 +134,12 @@ final class PickleUnpickler {
                     let index = Int(try readUInt32())
                     if let top = stack.last {
                         memo[index] = top
+                    }
+                    
+                case MEMOIZE:
+                    // 148 (0x94): Pushes top of stack into memo at next available index
+                    if let top = stack.last {
+                        memo[memo.count] = top
                     }
                     
                 case BINGET:
@@ -139,7 +171,7 @@ final class PickleUnpickler {
                 case SETITEM:
                     guard let value = stack.popLast(),
                           let key = stack.popLast() else {
-                        throw PickleError.invalidStructure
+                        throw PickleError.stackUnderflow
                     }
                     guard let dict = stack.last as? NSMutableDictionary else {
                          throw PickleError.invalidStructure
@@ -147,7 +179,6 @@ final class PickleUnpickler {
                     dict[key] = value
                     
                 case APPENDS:
-                    // print("OP: APPENDS")
                     var items: [Any] = []
                     while true {
                         let top = stack.popLast()
@@ -157,7 +188,6 @@ final class PickleUnpickler {
                     }
                     // List is below mark
                     guard let list = stack.last as? NSMutableArray else { 
-                        print("APPENDS: Object below mark is not NSMutableArray, is \(type(of: stack.last))")
                         throw PickleError.invalidStructure 
                     }
                     for item in items.reversed() {
@@ -165,25 +195,17 @@ final class PickleUnpickler {
                     }
                     
                 case SETITEMS:
-                    // print("OP: SETITEMS")
-                    // Pop until mark
                     var items: [(Any, Any)] = []
                     while true {
                         let top = stack.popLast()
                         if top is Mark { break }
                          guard let value = top, let key = stack.popLast() else { 
-                             print("SETITEMS: Stack underflow while popping key/value")
                              throw PickleError.stackUnderflow 
                          }
                         items.append((key, value))
                     }
                     // Target dict is below mark
                     guard let dict = stack.last as? NSMutableDictionary else { 
-                        if let actual = stack.last {
-                            print("SETITEMS: Object below mark is not NSMutableDictionary, is \(type(of: actual))")
-                        } else {
-                            print("SETITEMS: Stack empty below mark")
-                        }
                         throw PickleError.invalidStructure 
                     }
                     for (key, value) in items.reversed() {
@@ -200,6 +222,27 @@ final class PickleUnpickler {
                 case BINFLOAT:
                     let val = try readFloat64()
                     stack.append(val)
+                    
+                case BINBYTES:
+                    let len = Int(try readUInt32())
+                    let bytes = data.subdata(in: position..<position+len)
+                    position += len
+                    stack.append(bytes)
+                    
+                case SHORT_BINBYTES:
+                    let len = Int(readByte())
+                    let bytes = data.subdata(in: position..<position+len)
+                    position += len
+                    stack.append(bytes)
+
+                case NEWOBJ:
+                    guard let args = stack.popLast() as? [Any],
+                          let cls = stack.popLast() as? GlobalReference else {
+                        throw PickleError.invalidStructure
+                    }
+                    var ref = cls
+                    ref.args = args
+                    stack.append(ref)
                     
                 case BUILD:
                     // Build object state
