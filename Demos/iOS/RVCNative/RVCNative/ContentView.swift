@@ -407,15 +407,6 @@ struct ContentView: View {
 
         refreshImportedModels()
 
-        // Auto-load first model if none selected
-        if selectedModel == "Select Model" {
-            if !importedModels.isEmpty {
-                loadModel(name: importedModels[0], isImported: true)
-            } else {
-                loadModel(name: "Coder")
-            }
-        }
-
         // Pre-load stock audio
         if inputURL == nil {
             if let stock = stockAudioURL {
@@ -630,14 +621,15 @@ struct ContentView: View {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         guard let files = try? FileManager.default.contentsOfDirectory(at: docs, includingPropertiesForKeys: nil) else { return }
 
-        importedModels = files
+        let names = files
             .filter { 
                 let ext = $0.pathExtension.lowercased()
                 return ext == "safetensors" || ext == "npz" || ext == "pth" || ext == "pt" || ext == "zip"
             }
             .map { $0.deletingPathExtension().lastPathComponent }
             .filter { !$0.hasPrefix(".") && !$0.lowercased().contains("hubert") && !$0.lowercased().contains("rmvpe") }
-            .sorted()
+
+        importedModels = Array(Set(names)).sorted()
     }
 
     func loadModel(name: String, isImported: Bool = false) {
