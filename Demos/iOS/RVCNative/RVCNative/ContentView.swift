@@ -740,10 +740,13 @@ struct ContentView: View {
                 finalHubertURL = safetensorsURL
             } else {
                 log("Auto-converting hubert_base.\(hubertURL.pathExtension) to safetensors...")
-                if let arrays = try? PthConverter.shared.convert(url: hubertURL, copyIndexTo: docs) {
-                    try? MLX.save(arrays: arrays, url: safetensorsURL)
+                do {
+                    let arrays = try PthConverter.shared.convert(url: hubertURL, copyIndexTo: docs)
+                    try MLX.save(arrays: arrays, url: safetensorsURL)
                     finalHubertURL = safetensorsURL
                     log("hubert_base converted and saved to \(safetensorsURL.path)")
+                } catch {
+                    log("ERROR: hubert_base conversion failed: \(error.localizedDescription)")
                 }
             }
         }
@@ -776,10 +779,13 @@ struct ContentView: View {
                 finalRmvpeURL = safetensorsURL
             } else {
                 log("Auto-converting rmvpe.\(rmURL.pathExtension) to safetensors...")
-                if let arrays = try? PthConverter.shared.convert(url: rmURL, copyIndexTo: docs) {
-                    try? MLX.save(arrays: arrays, url: safetensorsURL)
+                do {
+                    let arrays = try PthConverter.shared.convert(url: rmURL, copyIndexTo: docs)
+                    try MLX.save(arrays: arrays, url: safetensorsURL)
                     finalRmvpeURL = safetensorsURL
                     log("rmvpe converted and saved to \(safetensorsURL.path)")
+                } catch {
+                    log("ERROR: rmvpe conversion failed: \(error.localizedDescription)")
                 }
             }
         }
