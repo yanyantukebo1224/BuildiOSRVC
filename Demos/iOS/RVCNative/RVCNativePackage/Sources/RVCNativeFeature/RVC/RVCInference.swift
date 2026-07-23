@@ -895,6 +895,8 @@ import MLXNN
 
             log("DEBUG: Before Synthesizer - phone: \(phone.shape), pitch: \(pitchFinal.shape), nsff0: \(nsff0.shape)")
 
+            MLX.GPU.clearCache()  // MEMORY FIX: Clear before Synthesizer execution
+
             let audioOut = synthesizer.infer(
                 phone: phone,
                 phoneLengths: phoneLengths,
@@ -902,8 +904,10 @@ import MLXNN
                 nsff0: nsff0,
                 sid: sid
             )
+            MLX.eval(audioOut)
+            MLX.GPU.clearCache()  // MEMORY FIX: Clear after Synthesizer execution
             
-        return audioOut // [1, T_out, 1]
+            return audioOut // [1, T_out, 1]
         }
 
         /// Run benchmark: perform inference and compare with reference audio
