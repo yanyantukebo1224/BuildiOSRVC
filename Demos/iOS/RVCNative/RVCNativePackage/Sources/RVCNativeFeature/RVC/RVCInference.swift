@@ -621,10 +621,12 @@ import MLXNN
             indexRate: Float = 0.75,       // Feature retrieval blend
             volumeEnvelope: Float = 1.0
         ) async {
+            log("RVCInference: infer() START - audioURL: \(audioURL.lastPathComponent), f0Method: \(f0Method), pitchShift: \(pitchShift)")
             do {
                 DispatchQueue.main.async { self.status = "Loading Audio..." }
                 
                 // Load whole audio (Float array size is fine, just not tensors)
+                log("RVCInference: Attempting AudioProcessor.shared.loadAudio...")
                 let (audioArray, _) = try AudioProcessor.shared.loadAudio(url: audioURL)
                 // audioArray: [TotalSamples]
                 
@@ -1012,13 +1014,8 @@ import MLXNN
             
             guard n > 1 else { return audio }
             
-            // Left pad: reverse of samples[1...padding]
-            // If padding > n, this simple logic fails, but we assume padding < n (16000 < 30s audio)
-            // Python: pad=2, [0,1,2] -> [2,1, 0,1,2]
-            
             var leftPad: [Float] = []
-            if padding > 0 {
-                // indices: 1 to padding
+            if padding > 0 && n > 1 {
                 let start = 1
                 let end = min(padding, n - 1)
                 if end >= start {
@@ -1027,15 +1024,10 @@ import MLXNN
             }
             
             var rightPad: [Float] = []
-            if padding > 0 {
-                // indices: (n-1-padding) to (n-2)
-                // Python: pad=2, [0,1,2] -> [0,1,2, 1,0]
-                // indices reflected around last element (2): 1, 0
-                // indices: n-2 down to n-1-padding
-                
-                let start = max(0, n - 1 - padding)
+            if padding > 0 && n > 1 {
                 let end = n - 2
-                if end >= start {
+                let start = max(0, n - 1 - padding)
+                if end >= start && start < samples.count && end < samples.count {
                     rightPad = Array(samples[start...end].reversed())
                 }
             }
