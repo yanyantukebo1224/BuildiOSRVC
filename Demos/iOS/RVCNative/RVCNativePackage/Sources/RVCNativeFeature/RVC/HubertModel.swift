@@ -261,7 +261,11 @@ class HubertFeatureExtractor: Module {
     }
     
     func callAsFunction(_ inputValues: MLXArray) -> MLXArray {
-        var h = inputValues.expandedDimensions(axis: -1)
+        // inputValues expected: [B, T, 1] (or [B, T] if 2D)
+        var h = inputValues
+        if h.ndim == 2 {
+            h = h.expandedDimensions(axis: -1)
+        }
         h = l0(h)
         h = l1(h)
         h = l2(h)
