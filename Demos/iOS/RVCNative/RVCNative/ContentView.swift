@@ -732,6 +732,22 @@ struct ContentView: View {
             return
         }
 
+        // Ensure hubert_base is converted to safetensors if it's .pt or .pth
+        var finalHubertURL = hubertURL
+        if hubertURL.pathExtension.lowercased() == "pt" || hubertURL.pathExtension.lowercased() == "pth" {
+            let safetensorsURL = docs.appendingPathComponent("hubert_base.safetensors")
+            if FileManager.default.fileExists(atPath: safetensorsURL.path) {
+                finalHubertURL = safetensorsURL
+            } else {
+                log("Auto-converting hubert_base.\(hubertURL.pathExtension) to safetensors...")
+                if let arrays = try? PthConverter.shared.convert(url: hubertURL, copyIndexTo: docs) {
+                    try? MLX.save(arrays: arrays, url: safetensorsURL)
+                    finalHubertURL = safetensorsURL
+                    log("hubert_base converted and saved to \(safetensorsURL.path)")
+                }
+            }
+        }
+
         // Optional RMVPE (Documents or Bundle)
         let docRmvpeSafe = docs.appendingPathComponent("rmvpe.safetensors")
         let docRmvpePt = docs.appendingPathComponent("rmvpe.pt")
@@ -751,6 +767,21 @@ struct ContentView: View {
                 ?? RVCInference.bundle.url(forResource: "rmvpe", withExtension: "npz", subdirectory: "Assets")
                 ?? RVCInference.bundle.url(forResource: "rmvpe_mlx", withExtension: "npz")
                 ?? RVCInference.bundle.url(forResource: "rmvpe_mlx", withExtension: "npz", subdirectory: "Assets")
+        }
+
+        var finalRmvpeURL = rmvpeURL
+        if let rmURL = rmvpeURL, (rmURL.pathExtension.lowercased() == "pt" || rmURL.pathExtension.lowercased() == "pth") {
+            let safetensorsURL = docs.appendingPathComponent("rmvpe.safetensors")
+            if FileManager.default.fileExists(atPath: safetensorsURL.path) {
+                finalRmvpeURL = safetensorsURL
+            } else {
+                log("Auto-converting rmvpe.\(rmURL.pathExtension) to safetensors...")
+                if let arrays = try? PthConverter.shared.convert(url: rmURL, copyIndexTo: docs) {
+                    try? MLX.save(arrays: arrays, url: safetensorsURL)
+                    finalRmvpeURL = safetensorsURL
+                    log("rmvpe converted and saved to \(safetensorsURL.path)")
+                }
+            }
         }
 
         // Search for matching index file (for imported models)
@@ -796,7 +827,7 @@ struct ContentView: View {
         Task {
             do {
                 log("Starting loadWeights task...")
-                try await inferenceEngine.loadWeights(hubertURL: hubertURL, modelURL: url, rmvpeURL: rmvpeURL)
+                try await inferenceEngine.loadWeights(hubertURL: finalHubertURL, modelURL: url, rmvpeURL: finalRmvpeURL)
                 log("loadWeights success")
 
                 // Load index file if found, otherwise unload any previous index
@@ -848,8 +879,12 @@ struct ContentView: View {
 
         log("Starting inference with input: \(input.lastPathComponent)")
 
-        isConverting = true
-        conversionProgress = 0.0
+        await MainActor.run {
+            isProcessing = true
+            isConverting = true
+            conversionProgress = 0.1
+            statusMessage = "Preparing audio..."
+        }
 
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let timestamp = Int(Date().timeIntervalSince1970)
@@ -861,8 +896,8 @@ struct ContentView: View {
         }
 
         await MainActor.run {
-            conversionProgress = 0.1
-            statusMessage = "Preparing audio..."
+            conversionProgress = 0.3
+            statusMessage = "Inferencing with \(selectedF0Method.uppercased())..."
         }
 
         log("Calling inferenceEngine.infer() with f0Method=\(selectedF0Method), pitchShift=\(pitchShift), featureRatio=\(featureRatio)")
@@ -881,6 +916,7 @@ struct ContentView: View {
         // Verify output file was created
         guard FileManager.default.fileExists(atPath: outputPath.path) else {
             await MainActor.run {
+                isProcessing = false
                 isConverting = false
                 statusMessage = "Conversion failed - no output file"
                 alertTitle = "Conversion Failed"
@@ -933,6 +969,7 @@ struct ContentView: View {
             outputURL = outputPath
             convertedWaveform = converted
             conversionProgress = 1.0
+            isProcessing = false
             isConverting = false
             statusMessage = "Done!"
 
