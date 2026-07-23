@@ -85,6 +85,13 @@ import MLXNN
         public func loadWeights(hubertURL: URL, modelURL: URL, rmvpeURL: URL? = nil, crepeURL: URL? = nil) async throws {
             DispatchQueue.main.async { self.status = "Loading models..." }
             
+            // Unload previously loaded models & clear GPU memory cache to prevent memory pressure crash
+            self.hubertModel = nil
+            self.synthesizer = nil
+            self.rmvpe = nil
+            self.crepe = nil
+            MLX.GPU.clearCache()
+            
             // 1. Load Hubert
             log("RVCInference: Loading Hubert from \(hubertURL.lastPathComponent)")
             let hubertWeights = try MLX.loadArrays(url: hubertURL)
@@ -143,6 +150,8 @@ import MLXNN
             log("RVCInference: Loaded \(newParams.count) HuBERT weights")
             log("RVCInference: HuBERT sample keys: \(Array(newParams.keys.prefix(5)))")
             self.hubertModel?.update(parameters: ModuleParameters.unflattened(newParams))
+            MLX.eval(self.hubertModel?.parameters() ?? [:])
+            MLX.GPU.clearCache()
             
             // 2. Load Synthesizer (TextEncoder + Flow + Generator)
             log("RVCInference: Loading Synthesizer from \(modelURL.lastPathComponent)")
@@ -436,6 +445,8 @@ import MLXNN
 
             self.synthesizer?.update(parameters: ModuleParameters.unflattened(synthParams))
             self.synthesizer?.train(false)  // CRITICAL: Set to eval mode (disables Dropout, uses BatchNorm running stats)
+            MLX.eval(self.synthesizer?.parameters() ?? [:])
+            MLX.GPU.clearCache()
             log("RVCInference: Successfully loaded Synthesizer with \(synthParams.count) weight keys")
 
             // DEBUG: Verify weights are loaded correctly
