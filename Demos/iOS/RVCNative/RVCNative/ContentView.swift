@@ -646,7 +646,13 @@ struct ContentView: View {
             "Slim Shady": "Slim_Shady_New"
         ]
 
-        // Map name to file - use mapping for bundled, or convert name for imported
+        let lowerName = name.lowercased()
+        if lowerName.contains("hubert") || lowerName.contains("rmvpe") {
+            log("loadModel: \(name) is a base/pitch model, skipping voice model load.")
+            statusMessage = "\(name) loaded as base component."
+            return
+        }
+
         let filename: String
         if let mappedName = bundledModelMapping[name], !isImported {
             filename = mappedName
