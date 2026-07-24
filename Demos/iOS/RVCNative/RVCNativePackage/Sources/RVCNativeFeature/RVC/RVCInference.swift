@@ -107,13 +107,13 @@ import MLXNN
                     }
                 }
                 
-                // Remap feature_extractor.conv_layers.N.0 -> feature_extractor.lN.conv, 2 -> layer_norm
+                // Remap feature_extractor.conv_layers.N.0 -> feature_extractor.lN.conv.weight, 2 -> layer_norm
                 if newKey.hasPrefix("feature_extractor.conv_layers.") {
                     let parts = newKey.components(separatedBy: ".")
                     if parts.count >= 3, let idx = Int(parts[2]) {
                         var subPath = parts.dropFirst(3).joined(separator: ".")
                         if subPath.hasPrefix("0.") {
-                            subPath = "conv." + String(subPath.dropFirst(2))
+                            subPath = "conv.weight"
                         } else if subPath.hasPrefix("2.") {
                             subPath = "layer_norm." + String(subPath.dropFirst(2))
                         }
