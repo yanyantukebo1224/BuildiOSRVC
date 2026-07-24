@@ -20,7 +20,7 @@ public final class PthConverter: Sendable {
     /// - Parameter progress: Closure to report progress (0.0 to 1.0) and status message.
     /// - Returns: A dictionary of [String: MLXArray] ready to be saved or used.
     public func convert(url: URL, copyIndexTo: URL? = nil, progress: (@Sendable (Double, String) -> Void)? = nil) throws -> [String: MLXArray] {
-        return try autoreleasepool {
+        return try autoreleasepool { () -> [String: MLXArray] in
             // 1. Unzip to temp
             progress?(0.05, "Extracting archive...")
         let fm = FileManager.default
