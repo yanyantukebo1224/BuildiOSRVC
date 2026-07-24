@@ -20,8 +20,9 @@ public final class PthConverter: Sendable {
     /// - Parameter progress: Closure to report progress (0.0 to 1.0) and status message.
     /// - Returns: A dictionary of [String: MLXArray] ready to be saved or used.
     public func convert(url: URL, copyIndexTo: URL? = nil, progress: (@Sendable (Double, String) -> Void)? = nil) throws -> [String: MLXArray] {
-        // 1. Unzip to temp
-        progress?(0.05, "Extracting archive...")
+        return try autoreleasepool {
+            // 1. Unzip to temp
+            progress?(0.05, "Extracting archive...")
         let fm = FileManager.default
         let tempDir = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try fm.createDirectory(at: tempDir, withIntermediateDirectories: true)
@@ -204,6 +205,7 @@ public final class PthConverter: Sendable {
         
         progress?(1.0, "Conversion complete!")
         return mlxDict
+        }
     }
     
     private func loadTensor(ref: TensorReference, baseDir: URL) throws -> MLXArray {

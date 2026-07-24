@@ -548,6 +548,13 @@ struct ContentView: View {
                             isConverting = false
                             conversionProgress = 1.0
                             refreshImportedModels()
+                        }
+
+                        // Memory GC yield before load
+                        MLX.GPU.clearCache()
+                        await Task.yield()
+
+                        await MainActor.run {
                             loadModel(name: modelName, isImported: true)
                             alertTitle = "Success"
                             alertMessage = "Model '\(modelName)' extracted and ready!"

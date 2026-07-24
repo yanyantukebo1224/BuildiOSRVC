@@ -85,12 +85,10 @@ import MLXNN
         public func loadWeights(hubertURL: URL, modelURL: URL, rmvpeURL: URL? = nil, crepeURL: URL? = nil) async throws {
             DispatchQueue.main.async { self.status = "Loading models..." }
             
-            // Unload previously loaded models & clear GPU memory cache to prevent memory pressure crash
-            self.hubertModel = nil
-            self.synthesizer = nil
-            self.rmvpe = nil
-            self.crepe = nil
+            // 1. Unload previously loaded models & clear GPU memory cache to prevent OOM crash on model switch
+            unloadModels()
             MLX.GPU.clearCache()
+            await Task.yield()
             
             // 1. Load Hubert
             log("RVCInference: Loading Hubert from \(hubertURL.lastPathComponent)")
