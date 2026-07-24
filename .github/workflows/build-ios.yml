@@ -9,52 +9,61 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14
+    name: Build iOS App
+    runs-on: macos-15
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Select Xcode Version
-      run: sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer
+      - name: Select latest Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: 'latest-stable'
 
-    - name: Change Directory
-      run: cd Demos/iOS/RVCNative
+      - name: Install mlx-swift dependency
+        run: |
+          cd Demos/iOS/RVCNative
+          mkdir -p Vendor
+          if [ ! -f "Vendor/mlx-swift/Package.swift" ]; then
+            echo "mlx-swift submodule is missing or empty. Cloning from GitHub at tag 0.21.0..."
+            rm -rf Vendor/mlx-swift
+            git clone --depth 1 --branch 0.21.0 https://github.com/ml-explore/mlx-swift.git Vendor/mlx-swift
+            cd Vendor/mlx-swift
+            git submodule update --init --recursive
+          fi
 
-    # 1. パッケージ依存関係の解決
-    - name: Resolve Swift Package Dependencies
-      run: |
-        cd Demos/iOS/RVCNative
-        xcodebuild -resolvePackageDependencies \
-          -workspace RVCNative.xcworkspace \
-          -scheme RVCNative
+      - name: Resolve Xcode Dependencies
+        run: |
+          cd Demos/iOS/RVCNative
+          xcodebuild -resolvePackageDependencies -workspace RVCNative.xcworkspace -scheme RVCNative
 
-    # 2. Release モードで Archive（本番用バイナリの書き出し）を作成
-    - name: Build Archive
-      run: |
-        cd Demos/iOS/RVCNative
-        xcodebuild archive \
-          -workspace RVCNative.xcworkspace \
-          -scheme RVCNative \
-          -sdk iphoneos \
-          -configuration Release \
-          -archivePath build/RVCNative.xcarchive \
-          ENABLE_PREVIEWS=NO \
-          CODE_SIGNING_ALLOWED=NO \
-          CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGN_IDENTITY=""
+      # 💡 変更点: build ではなく archive を使い、Release モードで単体動作バイナリを作成
+      - name: Archive iOS App (Release)
+        run: |
+          cd Demos/iOS/RVCNative
+          xcodebuild archive \
+            -workspace RVCNative.xcworkspace \
+            -scheme RVCNative \
+            -sdk iphoneos \
+            -configuration Release \
+            -archivePath build/RVCNative.xcarchive \
+            ENABLE_PREVIEWS=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
 
-    # 3. 正常な構造の IPA ファイルを作成
-    - name: Package IPA
-      run: |
-        cd Demos/iOS/RVCNative
-        mkdir -p Payload
-        cp -R build/RVCNative.xcarchive/Products/Applications/RVCNative.app Payload/
-        zip -r RVCNative.ipa Payload
+      # 💡 変更点: xcarchive のProductsフォルダから完全にパッキングされた.appを取り出してIPA化
+      - name: Package IPA
+        run: |
+          cd Demos/iOS/RVCNative
+          mkdir -p build/Payload
+          cp -R build/RVCNative.xcarchive/Products/Applications/RVCNative.app build/Payload/
+          cd build
+          zip -r RVCNative.ipa Payload
 
-    # 4. 成果物（IPA）のアップロード
-    - name: Upload IPA Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: RVCNative-IPA
-        path: Demos/iOS/RVCNative/RVCNative.ipa
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RVCNative-IPA
+          path: Demos/iOS/RVCNative/build/RVCNative.ipa
