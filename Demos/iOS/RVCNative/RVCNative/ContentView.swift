@@ -468,7 +468,7 @@ struct ContentView: View {
             }
         }
 
-        let filename = selectedFile.lastPathComponent
+        let filename = selectedFile.lastPathComponent.precomposedStringWithCanonicalMapping
         let destURL = docs.appendingPathComponent(filename)
 
         do {
@@ -602,7 +602,10 @@ struct ContentView: View {
             }
         }
 
-        let destURL = docs.appendingPathComponent(selectedFile.lastPathComponent)
+        // Clean & Normalize Unicode filename for Japanese / UTF-8 compatibility
+        let rawFilename = selectedFile.lastPathComponent
+        let cleanFilename = rawFilename.precomposedStringWithCanonicalMapping
+        let destURL = docs.appendingPathComponent(cleanFilename)
 
         do {
             if !isAlreadyInDocs {
