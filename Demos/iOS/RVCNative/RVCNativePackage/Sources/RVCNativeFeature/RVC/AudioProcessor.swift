@@ -108,19 +108,27 @@ final class AudioProcessor: @unchecked Sendable {
         }
         
         let ratio = targetRate / sourceRate
-        let targetFrameCount = AVAudioFrameCount(Double(buffer.frameLength) * ratio)
+        let targetFrameCount = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 1024
         
-        // Restore declarations
-        let targetBuffer = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: targetFrameCount)!
+        guard let targetBuffer = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: targetFrameCount) else {
+            throw NSError(domain: "AudioProcessor", code: 5, userInfo: [NSLocalizedDescriptionKey: "Target buffer creation failed"])
+        }
+        
         var error: NSError? = nil
+        var hasProvidedData = false
         
         struct BufferWrapper: @unchecked Sendable {
             let buffer: AVAudioPCMBuffer
         }
         let wrapper = BufferWrapper(buffer: buffer)
         
-        // AVAudioConverterInputBlock
+        // AVAudioConverterInputBlock - Must return data ONCE, then return noData / endOfStream
         let inputBlock: AVAudioConverterInputBlock = { inNumPackets, outStatus in
+            if hasProvidedData {
+                outStatus.pointee = .noData
+                return nil
+            }
+            hasProvidedData = true
             outStatus.pointee = .haveData
             return wrapper.buffer
         }

@@ -68,6 +68,7 @@ struct ContentView: View {
     // Conversion Progress
     @State private var conversionProgress: Double = 0.0
     @State private var isConverting: Bool = false
+    @State private var loadTask: Task<Void, Never>? = nil
     @State private var isManagingModels: Bool = false
     @State private var isEditMode: Bool = false
     @State private var alertTitle: String = "Alert"
@@ -840,10 +841,15 @@ struct ContentView: View {
             }
         }
 
-        Task {
+        // Cancel any previous in-flight model loading task
+        loadTask?.cancel()
+
+        loadTask = Task {
             do {
+                if Task.isCancelled { return }
                 log("Starting loadWeights task...")
                 try await inferenceEngine.loadWeights(hubertURL: finalHubertURL, modelURL: url, rmvpeURL: finalRmvpeURL)
+                if Task.isCancelled { return }
                 log("loadWeights success")
 
                 // Load index file if found, otherwise unload any previous index
@@ -858,16 +864,17 @@ struct ContentView: View {
                     inferenceEngine.unloadIndex()
                 }
 
+                if Task.isCancelled { return }
                 await MainActor.run {
                     statusMessage = "Loaded \(name)"
                     isModelLoaded = true
                 }
             } catch {
+                if Task.isCancelled { return }
                 log("loadWeights failed: \(error)")
                 await MainActor.run {
                     statusMessage = "Failed to load \(name): \(error.localizedDescription)"
                     isModelLoaded = false
-
                     alertTitle = "Load Failed"
                     alertMessage = error.localizedDescription
                     showAlert = true
