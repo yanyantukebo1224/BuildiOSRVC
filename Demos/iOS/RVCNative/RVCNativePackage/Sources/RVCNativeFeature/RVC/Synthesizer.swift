@@ -506,13 +506,11 @@ public class Synthesizer: Module {
         
         // Encode features
         let (m_p, logs_p, xMask) = enc_p(phone, pitch: pitch, lengths: phoneLengths)
-        print("DEBUG: TextEncoder output - m_p: \(m_p.shape) [\(m_p.min().item(Float.self))...\(m_p.max().item(Float.self))], logs_p: \(logs_p.shape) [\(logs_p.min().item(Float.self))...\(logs_p.max().item(Float.self))], xMask: \(xMask.shape)")
 
         // Sample from encoded distribution
         // CRITICAL: xMask is already (B, 1, T) from TextEncoder - don't expand it!
         // Broadcasts: (B, C, T) * (B, 1, T) = (B, C, T)
         let z_p = (m_p + exp(logs_p) * MLXRandom.normal(m_p.shape).asType(m_p.dtype) * 0.0) * xMask
-        print("DEBUG: z_p shape: \(z_p.shape), stats: min \(z_p.min().item(Float.self)), max \(z_p.max().item(Float.self))")
 
         // Flow reverse pass
         // Convert to (B, T, C) format for Flow (Python line 117-118)
@@ -520,7 +518,6 @@ public class Synthesizer: Module {
         let xMask_transposed = xMask.transposed(0, 2, 1)  // (B, 1, T) -> (B, T, 1)
 
         let z_mlx = flow(z_p_transposed, xMask: xMask_transposed, g: g, reverse: true)  // Output: (B, T, C)
-        print("DEBUG: z_mlx (after flow) shape: \(z_mlx.shape), stats: min \(z_mlx.min().item(Float.self)), max \(z_mlx.max().item(Float.self))")
 
         // Convert back to (B, C, T) for decoder (Python line 123)
         let z = z_mlx.transposed(0, 2, 1)  // (B, T, C) -> (B, C, T)
@@ -529,7 +526,6 @@ public class Synthesizer: Module {
         // Decoder input: z * x_mask where both are (B, C, T)
         // Python line 128: o = self.dec(z * x_mask, nsff0, g=g)
         let output = dec(z * xMask, f0: nsff0 ?? MLX.zeros([phone.shape[0], phone.shape[1], 1]), g: g)
-        print("DEBUG: Generator output stats: min \(output.min().item(Float.self)), max \(output.max().item(Float.self))")
         
         return output
     }
